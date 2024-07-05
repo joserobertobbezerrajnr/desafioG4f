@@ -2,10 +2,12 @@ package com.bancojose.cartoes_ms.service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.bancojose.cartoes_ms.client.EmissorClient;
 import com.bancojose.cartoes_ms.model.CartaoProposta;
 import com.bancojose.cartoes_ms.model.Cliente;
 import com.bancojose.cartoes_ms.repository.CartaoPropostaRepository;
@@ -18,6 +20,9 @@ public class CartaoService {
 
     @Autowired
     private ClienteRepository clienteRepository;
+    
+    @Autowired
+    private EmissorClient emissorClient;
 
     public CartaoProposta criarProposta(Long clienteId, Double limiteProposto) {
         Optional<Cliente> clienteOpt = clienteRepository.findById(clienteId);
@@ -41,7 +46,17 @@ public class CartaoService {
         if (propostaOpt.isPresent()) {
             CartaoProposta proposta = propostaOpt.get();
             proposta.setStatus("APPROVED");
-            return cartaoPropostaRepository.save(proposta);
+            cartaoPropostaRepository.save(proposta);
+
+            // Gerar dados do cartão
+            String numeroCartao = gerarNumeroCartao();
+            String validade = "12/28";  // Exemplo
+            String cvv = gerarCVV();
+
+            // Enviar notificação por e-mail
+            emissorClient.enviarEmail(proposta.getCliente().getEmail(), proposta.getCliente().getNome(), numeroCartao, validade, cvv);
+
+            return proposta;
         }
         throw new RuntimeException("Proposta não encontrada");
     }
@@ -54,5 +69,19 @@ public class CartaoService {
             return cartaoPropostaRepository.save(proposta);
         }
         throw new RuntimeException("Proposta não encontrada");
+    }
+    
+    private String gerarNumeroCartao() {
+        Random rand = new Random();
+        return String.format("%04d %04d %04d %04d", 
+                             rand.nextInt(10000), 
+                             rand.nextInt(10000), 
+                             rand.nextInt(10000), 
+                             rand.nextInt(10000));
+    }
+
+    private String gerarCVV() {
+        Random rand = new Random();
+        return String.format("%03d", rand.nextInt(1000));
     }
 }
